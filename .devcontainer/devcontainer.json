@@ -1,0 +1,11 @@
+{
+	"name": "Ansible Standard Dev Env: Debian 9, Python 3.7, Ansible Devel (2.10)",
+	"dockerFile": "Dockerfile",
+	"context": "..",
+	"extensions": [
+		"ms-python.python"
+	],
+	"settings": {
+		"python.pythonPath": "/usr/local/bin/python"
+	}
+}
