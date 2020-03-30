@@ -8,22 +8,7 @@ Here is an example directory of the majority of plugins currently supported by A
 
 ```
 └── plugins
-    ├── action
-    ├── become
-    ├── cache
-    ├── callback
-    ├── cliconf
-    ├── connection
-    ├── filter
-    ├── httpapi
-    ├── inventory
-    ├── lookup
-    ├── module_utils
     ├── modules
-    ├── netconf
-    ├── shell
-    ├── strategy
-    ├── terminal
     ├── test
     └── vars
 ```

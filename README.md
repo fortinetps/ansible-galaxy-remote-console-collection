@@ -37,7 +37,7 @@ Create fw_global_set.yml with the following template:
 ---
 - hosts: localhost
   collections:
-  - fortinetps.fortios
+  - fortinetps.remote_console
   vars:
    term_server: "remote console server hostname or ip address"
    term_user: "remote console server login username"

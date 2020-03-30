@@ -684,17 +684,28 @@ class fortigate_remote_console():
             while index and attempt:
                 # try connect to remote console server
                 # expect to see the password prompt
-                self.rcs_console = pexpect.spawn(ssh_connection_string, timeout=60)
-                index = self.rcs_console.expect(['assword: ', 'Connection reset by peer', pexpect.EOF, pexpect.TIMEOUT], timeout=60)
+                self.rcs_console = pexpect.spawn(ssh_connection_string)
+                index = self.rcs_console.expect(['assword: ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
                 if index:
                     outputs.append('Failed to connect to remote console server ' + str(self.rcs_timeout + 1 - attempt))
                 output = self.rcs_console.before.splitlines()
                 outputs.append(output)
                 attempt = attempt - 1
 
-            if attempt == 0:
+            # pexpect.EOF - Raised when EOF is read from a child. This usually means the child has exited.
+            # when test with MRV remote console server with max mirror connection = 1, (exclusive access to console port)
+            # MRV won't even give you password prompt, it simply returns EOF when it sees another connection attempt
+            # For Avocent remote console server, it handle this "non-simultaneous session" differently
+            # Avocent remote console server will accept the login first then give user error message
+            if index == 1:
                 raise Exception('Attemtp to connect to remote console server ' + str(self.rcs_timeout) +
                                 ' times, but all failed, please check if remote console port is being used by other user')
+
+            # pexpect.TIMEOUT - Raised when a read time exceeds the timeout.
+            # when disconnect remote console server (make it inaccessible) it returns TIMEOUT
+            if index == 2:
+                raise Exception('Attemtp to connect to remote console server ' + str(self.rcs_timeout) +
+                                ' times, but all failed, please check if remote console server is accessible')
 
             # send remote console server password
             self.rcs_console.sendline(self.rcs_password)
@@ -716,7 +727,7 @@ class fortigate_remote_console():
             while index != 3:
                 # send "enter" to FortiGate, FortiGate should spit out something, try to figure out what status/context FortiGate is in
                 self.rcs_console.sendline('')
-                index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', ' # ', pexpect.EOF])
+                index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', ' # ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
                 output = self.rcs_console.before.splitlines()
                 outputs.append(output)
                 # option#1(return 0) is not supposed to be matched
@@ -743,15 +754,28 @@ class fortigate_remote_console():
                     outputs.append(output)
                     if login_index:                                         # Login incorrect message
                         # Failed to first login attempt, try use blank password (this could be a factory reset device)
-                        self.rcs_console.sendline(self.rcs_fgt_username)    # this is username for FortiGate login
-                        self.rcs_console.expect('assword: ')
+                        # Here we are not suppose to see the login bannder, but just in case
+                        self.rcs_console.sendline('')
+                        index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', ' # ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
                         output = self.rcs_console.before.splitlines()
                         outputs.append(output)
-
+                        if index == 1:
+                            # see pre-login banner
+                            self.rcs_console.sendline('a')                  # press 'a' to accept pre-login banner
+                            self.rcs_console.expect(' login: ')
+                            output = self.rcs_console.before.splitlines()
+                            outputs.append(output)
+                        elif index == 2:
+                            self.rcs_console.sendline(self.rcs_fgt_username)    # this is username for FortiGate login
+                            self.rcs_console.expect('assword: ')
+                            output = self.rcs_console.before.splitlines()
+                            outputs.append(output)
                         self.rcs_console.sendline('')                       # try black password for FortiGate login
-                        self.rcs_console.expect(' # ')
+                        index = self.rcs_console.expect([' # ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
                         output = self.rcs_console.before.splitlines()
                         outputs.append(output)
+                        if index:
+                            raise Exception('Attemtp to login to FortiGate failed please check username/password for FortiGate')
                 elif index == 3:                                        # with this, we want to figure out the hostname for FortiGate for better expect/match
                     hostname = self.rcs_console.before.decode('utf-8').splitlines()[-1].split(' ')[0]
                     # the first split find the last line, which contains the hostname
@@ -773,8 +797,11 @@ class fortigate_remote_console():
                             prompt_index = self.rcs_console.expect(self.rcs_fgt_prompt)
                             output = self.rcs_console.before.splitlines()
                             outputs.append(output)
+                # This is to handle Avocent's "non-simultaneous session" access issue
                 elif index == 4:                                        # with this, raise exception
                     raise Exception('Attemtp to connect to remote console port but failed, please check if remote console port is being used by other user')
+                elif index == 5:                                        # with this, raise exception
+                    raise Exception('Attemtp to read/write remote console port but failed, please check if FortiGate is on and console port is connected')
 
             # Another thing we need to take care of is to set console output to standard mode (default is more mode)
             self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
@@ -803,6 +830,7 @@ class fortigate_remote_console():
             outputs.append(output)
 
         except Exception as error:
+            self.rcs_console.close()
             outputs.append(str(error).splitlines())
 
         finally:
@@ -901,7 +929,8 @@ def run_module():
             console_result = _fortigate_remote_console.fortigate_remote_console_purgedhcp()
             result['rcs_fgt_action_result'] = console_result['console_action_result']
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_purgedhcp, please check if remote console connection is being used by another user!',
+                module.fail_json(msg='Something wrong with rcs_fgt_purgedhcp, please check if remote console server is accessible and/or ' +
+                                     'FortiGate is on and connected and/or FortiGate console connection is being used by another user!',
                                  **result)
                 return
             result['changed'] = console_result['changed']    # a reboot action is always has changed = True
