@@ -1,0 +1,20 @@
+# served as metadata/ readme for all necessary files need to be deployed in production
+
+# exclude all files and folders by default
+**                                                                          export-ignore
+# exclude all files by default
+
+# include these files in root folder
+.gitattributes                                                              !export-ignore
+.devcontainer                                                               !export-ignore
+.devcontainer\devcontainer.json                                             !export-ignore
+.devcontainer\Dockerfile                                                    !export-ignore
+.vscode                                                                     !export-ignore
+.vscode\settings.json                                                       !export-ignore
+.vscode\launch.json                                                         !export-ignore
+.vscode\fortigate_remote_console_args_become.json                           !export-ignore
+plugins\modules\fortigate_remote_console.py                                 !export-ignore
+plugins\modules\fortimanager_remote_console.py                              !export-ignore
+plugins\README.md                                                           !export-ignore
+galaxy.yml                                                                  !export-ignore
+README.md                                                                   !export-ignore

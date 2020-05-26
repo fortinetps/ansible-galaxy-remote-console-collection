@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Ansible module to manage fortigate devices through remote console access
+# Ansible module to manage fortimanager devices through remote console access
 # (c) 2019, Don Yao <@fortinetps>
 # GNU General Public License v3.0+ (see COPYING or
 # https://www.gnu.org/licenses/gpl-3.0.txt)
@@ -14,21 +14,21 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 
 DOCUMENTATION = '''
 ---
-module: fortigate_remote_console
-short_description: FortiGate Remote Console Module
+module: fortimanager_remote_console
+short_description: FortiManager Remote Console Module
 version_added: "2.7"
 description:
-    - "This is fortigate_remote_console module, for FortiGate console access through remote console server (Cisco, Avocent, Raritan, MRV, ...)"
+    - "This is fortimanager_remote_console module, for FortiManager console access through remote console server (Cisco, Avocent, Raritan, MRV, ...)"
 author:
     - Don Yao (@fortinetps)
 
 notes:
-    - Tested against FortiGate-501E v5.6.5 with Avocent ACS8000 and MRV LX4032
-    - Only works with physical FortiGate appliance with serial console port
-    - This module is good for FortiGate without network conneciton, but with remote console connection (OOB)
-    - Or some action may cause FortiGate lose it is network connectivity, but OOB remote console connection stays
-    - Use this module to factoryreset FortiGate
-    - Use this module to bootstrap brand new FortiGate
+    - Tested against FortiManager-501E v5.6.5 with Avocent ACS8000 and MRV LX4032
+    - Only works with physical FortiManager appliance with serial console port
+    - This module is good for FortiManager without network conneciton, but with remote console connection (OOB)
+    - Or some action may cause FortiManager lose it is network connectivity, but OOB remote console connection stays
+    - Use this module to factoryreset FortiManager
+    - Use this module to bootstrap brand new FortiManager
     - Use this module to perform low level erase-disk
 
 options:
@@ -50,9 +50,9 @@ tags:
 - hostname
 fortios_api_system_config_restore:
   conn_params:
-    fortigate_username: admin
-    fortigate_password: test
-    fortigate_ip: 1.2.3.4
+    fortimanager_username: admin
+    fortimanager_password: test
+    fortimanager_ip: 1.2.3.4
     verify: false
   config:
   - filename: /firmware/backup_config.conf
@@ -74,55 +74,55 @@ import datetime
 from ansible.module_utils.basic import AnsibleModule
 
 
-class fortigate_remote_console():
-    def __init__(self, rcs_ip, rcs_username, rcs_password, rcs_fgt_username='admin', rcs_fgt_password='',
-                 rcs_fgt_port=None, rcs_fgt_cli=None, rcs_fgt_become=None, rcs_timeout=None):
+class fortimanager_remote_console():
+    def __init__(self, rcs_ip, rcs_username, rcs_password, rcs_fmg_username='admin', rcs_fmg_password='',
+                 rcs_fmg_port=None, rcs_fmg_cli=None, rcs_fmg_become=None, rcs_timeout=None):
         self.rcs_ip = rcs_ip
         self.rcs_username = rcs_username
         self.rcs_password = rcs_password
-        self.rcs_fgt_port = rcs_fgt_port
-        self.rcs_fgt_username = rcs_fgt_username
-        self.rcs_fgt_password = rcs_fgt_password
-        self.rcs_fgt_cli = rcs_fgt_cli
-        self.rcs_fgt_become = rcs_fgt_become
+        self.rcs_fmg_port = rcs_fmg_port
+        self.rcs_fmg_username = rcs_fmg_username
+        self.rcs_fmg_password = rcs_fmg_password
+        self.rcs_fmg_cli = rcs_fmg_cli
+        self.rcs_fmg_become = rcs_fmg_become
         self.rcs_timeout = rcs_timeout
 
         self.rcs_prompt = None          # CLI prompt for remote console server (rcs) itself
         self.rcs_console = None         # Remote Console connection (for console access)
-        self.rcs_fgt_prompt = None      # CLI prompt for device (FGT) connected to the remote console port
+        self.rcs_fmg_prompt = None      # CLI prompt for device (FGT) connected to the remote console port
 
         self.serial = None
         self.version = None
         self.factorydefault = None
 
     ############################################################################
-    def fortigate_remote_console_cli(self):
+    def fortimanager_remote_console_cli(self):
         outputs = []
         rcs_result = {}
         rcs_result['status'] = 1
         rcs_result['changed'] = False
 
         try:
-            output = self.fortigate_remote_console_login()
+            output = self.fortimanager_remote_console_login()
             # outputs.append(output)
             if self.rcs_console.terminated:
                 raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
+                                % (self.rcs_ip, self.rcs_fmg_port, output))
 
             # for each command
-            for command in self.rcs_fgt_cli[0].splitlines():
+            for command in self.rcs_fmg_cli[0].splitlines():
                 self.rcs_console.sendline(command)
                 time.sleep(len(command)*8*5/9600)
-                index = self.rcs_console.expect(self.rcs_fgt_prompt)
-                output = self.rcs_console.before.splitlines()
+                index = self.rcs_console.expect(self.rcs_fmg_prompt)
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
 
-                if index == 3:    # with this, it seems like hostname was changed in the middle of the command (mostly by set hostname)
+                if index == 2:    # with this, it seems like hostname was changed in the middle of the command (mostly by set hostname)
                     hostname = self.rcs_console.before.decode('utf-8').splitlines()[-1].split(' ')[0]
                     # the first split find the last line, which contains the hostname
-                    # the second split, in case FortiGate is inside configuration section or in global/vdom, FortiGate doesn't allow space in hostname
+                    # the second split, in case FortiManager is inside configuration section or in global/vdom, FortiManager doesn't allow space in hostname
                     # update the hostname
-                    self.rcs_fgt_prompt = ['dummy_placeholder', hostname + ' # ', hostname + r' \(.+\) # ', ' # ', ' login: ', 'to accept']
+                    self.rcs_fmg_prompt = ['dummy_placeholder', hostname + ' # ', ' # ', r'\(.+\)# ', ' login: ', 'to accept']
 
                 elif index == 4 or index == 5:    # with this, it seems like password was changed in the middle of the command (mostly by set password)
                     # simple close the connection and return
@@ -139,31 +139,31 @@ class fortigate_remote_console():
 
         finally:
             if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
+                self.fortimanager_remote_console_logout()
             rcs_result['console_action_result'] = outputs
             return rcs_result
 
     ############################################################################
-    def fortigate_remote_console_reboot(self):
+    def fortimanager_remote_console_reboot(self):
         outputs = []
         rcs_result = {}
         rcs_result['status'] = 1
         rcs_result['changed'] = False
 
         try:
-            output = self.fortigate_remote_console_login()
+            output = self.fortimanager_remote_console_login()
             # outputs.append(output)
             if self.rcs_console.terminated:
                 raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
+                                % (self.rcs_ip, self.rcs_fmg_port, output))
 
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
+            self.rcs_console.sendline('config global')    # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
+            self.rcs_console.expect(self.rcs_fmg_prompt)
 
             # send exec factoryreset command
             self.rcs_console.sendline('exec reboot')
             self.rcs_console.expect([r'Do you want to continue\? \(y\/n\)'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             # send 'y' to confirm
@@ -173,7 +173,7 @@ class fortigate_remote_console():
             index = 0
             while index != 1 and index != 2:
                 index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', 'System is starting', 'please wait for reboot'], timeout=1800)
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
 
                 if index == 3:
@@ -193,26 +193,26 @@ class fortigate_remote_console():
 
         finally:
             if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
+                self.fortimanager_remote_console_logout()
             rcs_result['console_action_result'] = outputs
             return rcs_result
 
     ############################################################################
-    def fortigate_remote_console_factoryreset(self):
+    def fortimanager_remote_console_factoryreset(self):
         outputs = []
         rcs_result = {}
         rcs_result['status'] = 1
         rcs_result['changed'] = False
 
         try:
-            output = self.fortigate_remote_console_login()
+            output = self.fortimanager_remote_console_login()
             # outputs.append(output)
             if self.rcs_console.terminated:
                 raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
+                                % (self.rcs_ip, self.rcs_fmg_port, output))
 
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
+            self.rcs_console.sendline('config global')    # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
+            self.rcs_console.expect(self.rcs_fmg_prompt)
 
             # send exec factoryreset command
             if self.serial.find('FGVM') == 0:
@@ -220,7 +220,7 @@ class fortigate_remote_console():
             else:
                 self.rcs_console.sendline('exec factoryreset')
             self.rcs_console.expect([r'Do you want to continue\? \(y\/n\)'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             # send 'y' to confirm
@@ -231,7 +231,7 @@ class fortigate_remote_console():
             wait_for_reboot = True
             while index != 1:
                 index = self.rcs_console.expect(['dummy_placeholder', ' login: ', 'System is starting', 'please wait for reboot'], timeout=1800)
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
 
                 if index == 2:
@@ -252,57 +252,57 @@ class fortigate_remote_console():
 
         finally:
             if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
+                self.fortimanager_remote_console_logout()
             rcs_result['console_action_result'] = outputs
             return rcs_result
 
     ############################################################################
-    def fortigate_remote_console_erasedisk(self):
+    def fortimanager_remote_console_erasedisk(self):
         outputs = []
         rcs_result = {}
         rcs_result['status'] = 1    # preset rcs_outlet_port is invalid
         rcs_result['changed'] = False
 
         try:
-            output = self.fortigate_remote_console_login()
+            output = self.fortimanager_remote_console_login()
             # outputs.append(output)
             if self.rcs_console.terminated:
                 raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
+                                % (self.rcs_ip, self.rcs_fmg_port, output))
 
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
+            self.rcs_console.sendline('config global')    # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
+            self.rcs_console.expect(self.rcs_fmg_prompt)
 
             # send exec erase-disk command
             self.rcs_console.send('exec erase-disk ?')      # use send, not sendline here
             self.rcs_console.expect([r'exec erase\-disk'])   # the 1st time expects the command echo
             self.rcs_console.expect([r'exec erase\-disk'])   # the 2nd time expects the real outpout, which will prompot list of disks on your FGT system
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             # logout here now
-            self.fortigate_remote_console_logout()
+            self.fortimanager_remote_console_logout()
 
             # remove the empty line: if disk.strip()
             # remove the last line: output[0:-2], since the last line is cli prompt
             # remove the " (boot)": disk.strip().split(' ')[0]
             list_disk = [disk.decode('utf-8').strip().split(' ')[0] for disk in output[0:-2] if disk.strip()]
 
-            # every erasedisk would reboot the FortiGate
+            # every erasedisk would reboot the FortiManager
             for disk in list_disk:
-                self.fortigate_remote_console_login()
-                self.rcs_console.sendline('config global')  # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-                self.rcs_console.expect(self.rcs_fgt_prompt)
+                self.fortimanager_remote_console_login()
+                self.rcs_console.sendline('config global')  # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
+                self.rcs_console.expect(self.rcs_fmg_prompt)
 
                 self.rcs_console.sendline('exec erase-disk ' + disk)
                 self.rcs_console.expect(r'Are you sure you want to proceed\? \(y\/n\)')
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
 
                 # send 'y' to confirm
                 self.rcs_console.sendline('y')
                 self.rcs_console.expect(r'How many times do you wish to overwrite the media\?')
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
 
                 # erase # of times
@@ -312,26 +312,26 @@ class fortigate_remote_console():
 
                 if disk == 'SYSTEM':
                     self.rcs_console.expect(r'Do you want to restore the image after erasing\? \(y\/n\)')
-                    output = self.rcs_console.before.splitlines()
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
                     self.rcs_console.sendline('n')
 
                 outputs.append('WARNING:')
                 outputs.append('erase-disk starts running on ' + disk)
                 outputs.append('This will permanently erase all data from the storage media.')
-                outputs.append('Please do not unplug or turn off FortiGate and wait')
+                outputs.append('Please do not unplug or turn off FortiManager and wait')
 
                 start_time = datetime.datetime.now()
 
                 if disk != 'SYSTEM':
-                    # here we need to deal with some exception, sometime FortiGate doesn't like the erase-disk on data disk
+                    # here we need to deal with some exception, sometime FortiManager doesn't like the erase-disk on data disk
                     # it will reboot and reformat the data disk, which multiple reboots could happend
                     # if we see "please wait for reboot" before the login prompt, we will skip the login prompt
 
                     # some remote console server also support remote power functions (poweron/poweroff/reset)
-                    # for testing purpose, reboot FortiGate 20 seconds after erase-disk starts
+                    # for testing purpose, reboot FortiManager 20 seconds after erase-disk starts
                     # comment the follow lines in production
-                    # outputs.append('for testing purpose, reboot FortiGate 20 seconds after erase-disk starts')
+                    # outputs.append('for testing purpose, reboot FortiManager 20 seconds after erase-disk starts')
                     # time.sleep(20)
                     # self.rcs_outlet_reboot()
 
@@ -339,7 +339,7 @@ class fortigate_remote_console():
                     while index != 1 and index != 2:
                         index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', 'System is starting', 'please wait for reboot'],
                                                         timeout=7200)
-                        output = self.rcs_console.before.splitlines()
+                        output = self.rcs_console.before.decode('utf8').splitlines()
                         outputs.append(output)
 
                         if index == 3:
@@ -358,7 +358,7 @@ class fortigate_remote_console():
                                 rcs_result['changed'] = True
                 else:
                     self.rcs_console.expect(['You must format the boot device'], timeout=7200)  # erase-disk could take few hours, please adjust this number
-                    output = self.rcs_console.before.splitlines()
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
 
                     erase_time = datetime.datetime.now() - start_time
@@ -374,35 +374,35 @@ class fortigate_remote_console():
 
         finally:
             if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
+                self.fortimanager_remote_console_logout()
             rcs_result['console_action_result'] = outputs
             return rcs_result
 
     ############################################################################
-    def fortigate_remote_console_diskformat(self):
+    def fortimanager_remote_console_diskformat(self):
         outputs = []
         rcs_result = {}
         rcs_result['status'] = 1    # preset rcs_outlet_port is invalid
         rcs_result['changed'] = False
 
         try:
-            output = self.fortigate_remote_console_login()
+            output = self.fortimanager_remote_console_login()
             # outputs.append(output)
             if self.rcs_console.terminated:
                 raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
+                                % (self.rcs_ip, self.rcs_fmg_port, output))
 
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
+            self.rcs_console.sendline('config global')    # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
+            self.rcs_console.expect(self.rcs_fmg_prompt)
 
             # send exec disk list command and parse the output
             self.rcs_console.sendline('exec disk list')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
+            self.rcs_console.expect(self.rcs_fmg_prompt)
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             # logout for now
-            self.fortigate_remote_console_logout()
+            self.fortimanager_remote_console_logout()
 
             # remove the empty line: if info.strip()
             # remove the last line: output[0:-2], since the last line is cli prompt
@@ -429,16 +429,16 @@ class fortigate_remote_console():
                     zero_partition_disk.append(disk)
 
             if len(zero_partition_disk) != 0:
-                # every disk format would reboot the FortiGate, we only need to format those disk without partition
+                # every disk format would reboot the FortiManager, we only need to format those disk without partition
                 for disk in zero_partition_disk:
-                    self.fortigate_remote_console_login()
-                    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
+                    self.fortimanager_remote_console_login()
+                    # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
                     self.rcs_console.sendline('config global')
-                    self.rcs_console.expect(self.rcs_fgt_prompt)
+                    self.rcs_console.expect(self.rcs_fmg_prompt)
 
                     self.rcs_console.sendline('exec disk format ' + disk['ref'])
                     self.rcs_console.expect(r'Do you want to continue\? \(y\/n\)')
-                    output = self.rcs_console.before.splitlines()
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
 
                     # send 'y' to confirm
@@ -450,7 +450,7 @@ class fortigate_remote_console():
                     while index != 1 and index != 2:
                         index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', 'System is starting', 'please wait for reboot'],
                                                         timeout=7200)
-                        output = self.rcs_console.before.splitlines()
+                        output = self.rcs_console.before.decode('utf8').splitlines()
                         outputs.append(output)
 
                         if index == 3:
@@ -472,31 +472,31 @@ class fortigate_remote_console():
 
         finally:
             if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
+                self.fortimanager_remote_console_logout()
             rcs_result['console_action_result'] = outputs
             return rcs_result
 
     ############################################################################
-    def fortigate_remote_console_restoreimage(self):
+    def fortimanager_remote_console_restoreimage(self):
         outputs = []
         rcs_result = {}
         rcs_result['status'] = 1    # preset rcs_outlet_port is invalid
         rcs_result['changed'] = False
 
         try:
-            output = self.fortigate_remote_console_login()
+            output = self.fortimanager_remote_console_login()
             # outputs.append(output)
             if self.rcs_console.terminated:
                 raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
+                                % (self.rcs_ip, self.rcs_fmg_port, output))
 
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
+            self.rcs_console.sendline('config global')    # if FortiManager has VDOM enabled, if not, this will generate an message, but won't cause any problem
+            self.rcs_console.expect(self.rcs_fmg_prompt)
 
             # send exec factoryreset command
             self.rcs_console.sendline('exec reboot')
             self.rcs_console.expect([r'Do you want to continue\? \(y\/n\)'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             # send 'y' to confirm
@@ -506,21 +506,21 @@ class fortigate_remote_console():
             # the following are FGT specific, lots of hard coded params just for my lab
             # in order to make it work for production, we need to parameterize these settings
             self.rcs_console.expect([r'Press any key to display configuration menu\.\.\.'], timeout=300)
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
             time.sleep(1)
 
             self.rcs_console.sendline('')
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('C')  # [C]:  Configure TFTP parameters.
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
-            tftp_params = self.rcs_fgt_cli[0].splitlines()
+            tftp_params = self.rcs_fmg_cli[0].splitlines()
             tftp_local_ip = tftp_params[0].replace('"', '')
             tftp_local_netmask = tftp_params[1].replace('"', '')
             tftp_local_gw = tftp_params[2].replace('"', '')
@@ -528,11 +528,11 @@ class fortigate_remote_console():
             tftp_image_file = tftp_params[4].replace('"', '')
 
             self.rcs_console.send('I')  # [I]:  Set local IP address.
-            # self.rcs_console.sendline('192.168.210.'+str(int((int(self.rcs_fgt_port)/100))))
+            # self.rcs_console.sendline('192.168.210.'+str(int((int(self.rcs_fmg_port)/100))))
             self.rcs_console.sendline(tftp_local_ip)
             time.sleep(1)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('S')  # [S]:  Set local subnet mask.
@@ -540,7 +540,7 @@ class fortigate_remote_console():
             self.rcs_console.sendline(tftp_local_netmask)
             time.sleep(1)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('G')  # [G]:  Set local gateway.
@@ -548,7 +548,7 @@ class fortigate_remote_console():
             self.rcs_console.sendline(tftp_local_gw)
             time.sleep(1)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('T')  # [T]:  Set remote TFTP server IP address.
@@ -556,7 +556,7 @@ class fortigate_remote_console():
             self.rcs_console.sendline(tftp_server_ip)
             time.sleep(1)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('F')  # [F]:  Set firmware image file name.
@@ -565,19 +565,19 @@ class fortigate_remote_console():
             self.rcs_console.sendline(tftp_image_file)
             time.sleep(2)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('R')  # [R]:  Review TFTP parameters.
             time.sleep(1)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('Q')  # [Q]:  Quit this menu.
             time.sleep(1)
             self.rcs_console.expect(['Enter .+:'])
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
             self.rcs_console.send('T')  # [T]:  Initiate TFTP firmware transfer.
@@ -589,7 +589,7 @@ class fortigate_remote_console():
             index = 0
             while index != 1:
                 index = self.rcs_console.expect(['dummy_placeholder', ' login: ', 'System is starting', 'please wait for reboot'], timeout=1800)
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
 
                 if index == 2:
@@ -609,82 +609,16 @@ class fortigate_remote_console():
 
         finally:
             if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
+                self.fortimanager_remote_console_logout()
             rcs_result['console_action_result'] = outputs
             return rcs_result
 
     ############################################################################
-    def fortigate_remote_console_purgedhcp(self):
-        outputs = []
-        rcs_result = {}
-        rcs_result['status'] = 1    # preset rcs_outlet_port is invalid
-        rcs_result['changed'] = False
-
-        try:
-            output = self.fortigate_remote_console_login()
-            # outputs.append(output)
-            if self.rcs_console.terminated:
-                raise Exception("Problem with remote console connection, please check settings, and try 'ssh %s -p %s'.\n Error: %s"
-                                % (self.rcs_ip, self.rcs_fgt_port, output))
-
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-
-            # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.sendline('config system dhcp server')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            self.rcs_console.sendline('show')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-            show_old = output
-
-            # send exec factoryreset command
-            self.rcs_console.sendline('purge')
-            self.rcs_console.expect([r'Do you want to continue\? \(y\/n\)'])
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            # send 'y' to confirm
-            self.rcs_console.send('y')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            self.rcs_console.sendline('show')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-            show_new = output
-
-            if show_old != show_new:
-                rcs_result['changed'] = True
-
-            self.rcs_console.sendline('end')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            rcs_result['status'] = 0
-
-        except Exception as error:
-            outputs.append(str(error).splitlines())
-
-        finally:
-            if self.rcs_console and not self.rcs_console.terminated:
-                self.fortigate_remote_console_logout()
-            rcs_result['console_action_result'] = outputs
-            return rcs_result
-
-    ############################################################################
-    def fortigate_remote_console_login(self):
+    def fortimanager_remote_console_login(self):
         self.factorydefault = False
         outputs = []
         ssh_connection_string = 'ssh %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s -p %d'\
-                                % (self.rcs_ip, self.rcs_username, self.rcs_fgt_port)
+                                % (self.rcs_ip, self.rcs_username, self.rcs_fmg_port)
 
         try:
             index = 1
@@ -696,7 +630,7 @@ class fortigate_remote_console():
                 index = self.rcs_console.expect(['assword: ', pexpect.EOF, pexpect.TIMEOUT], timeout=60)
                 if index:
                     outputs.append('Failed to connect to remote console server ' + str(self.rcs_timeout + 1 - attempt))
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
                 attempt = attempt - 1
 
@@ -718,147 +652,118 @@ class fortigate_remote_console():
             # send remote console server password
             self.rcs_console.sendline(self.rcs_password)
 
-            # in some test environment, I need to run command (rcs_fgt_become) to access the FortiGate context
-            if self.rcs_fgt_become:
+            # in some test environment, I need to run command (rcs_fmg_become) to access the FortiManager context
+            if self.rcs_fmg_become:
                 # need to read and clear the buffer before we run become command
                 self.rcs_console.expect(' # ')
-                output = self.rcs_console.before.splitlines()
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
-                self.rcs_console.sendline(self.rcs_fgt_become)
+                self.rcs_console.sendline(self.rcs_fmg_become)
 
-            # now we should be in FortiGate context
+            # now we should be in FortiManager context
             # As we tested some Cisco remote console server, they would accespt passowrd but then return message like
             # "This connection is in use. User(s) currently connected: XXXXXXXX."
             # "You need privilege to make a simultaneous session."
             # Then remote console server terminate the connection (EOF)
             index = 0
             while index != 3:
-                # send "enter" to FortiGate, FortiGate should spit out something, try to figure out what status/context FortiGate is in
+                # send "enter" to FortiManager, FortiManager should spit out something, try to figure out what status/context FortiManager is in
                 self.rcs_console.sendline('')
-                index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', ' # ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
-                output = self.rcs_console.before.splitlines()
+                index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', ' # ', r'\(.+\)# ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
                 # option#1(return 0) is not supposed to be matched
-                # option#2(return 1) is when FortiGate display the pre-login banner
-                # option#3(return 2) is when FortiGate display login (self.rcs_fgt_prompt)
-                # option#4(return 3) is when FortiGate is already logged in
-                # option#5(return 4) is something we are not sure (it seems happens to Cisco remote console server without simutaneous session enabled)
+                # option#2(return 1) is when FortiManager display the pre-login banner
+                # option#3(return 2) is when FortiManager display login (self.rcs_fmg_prompt)
+                # option#4(return 3) is when FortiManager is already logged in
+                # option#4(return 4) is when FortiManager is already logged in, but left inside some configuration mode (FMG CLI specific)
+                # option#5(return 5) is something we are not sure (it seems happens to Cisco remote console server without simutaneous session enabled)
                 if index == 1:
                     # see pre-login banner
                     self.rcs_console.sendline('a')                          # press 'a' to accept pre-login banner
                     self.rcs_console.expect(' login: ')
-                    output = self.rcs_console.before.splitlines()
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
                 elif index == 2:
-                    # see FortiGate login
-                    self.rcs_console.sendline(self.rcs_fgt_username)        # this is username for FortiGate login
+                    # see FortiManager login
+                    self.rcs_console.sendline(self.rcs_fmg_username)        # this is username for FortiManager login
                     self.rcs_console.expect('assword: ')
-                    output = self.rcs_console.before.splitlines()
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
 
-                    self.rcs_console.sendline(self.rcs_fgt_password)        # this is password for FortiGate login
+                    self.rcs_console.sendline(self.rcs_fmg_password)        # this is password for FortiManager login
                     login_index = self.rcs_console.expect([' # ', 'Login incorrect'])
-                    output = self.rcs_console.before.splitlines()
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
                     if login_index:                                         # Login incorrect message
                         # Failed to first login attempt, try use blank password (this could be a factory reset device)
                         # Here we are not suppose to see the login bannder, but just in case
                         self.rcs_console.sendline('')
                         index = self.rcs_console.expect(['dummy_placeholder', 'to accept', ' login: ', ' # ', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
-                        output = self.rcs_console.before.splitlines()
+                        output = self.rcs_console.before.decode('utf8').splitlines()
                         outputs.append(output)
                         if index == 1:
                             # see pre-login banner
                             self.rcs_console.sendline('a')                  # press 'a' to accept pre-login banner
                             self.rcs_console.expect(' login: ')
-                            output = self.rcs_console.before.splitlines()
+                            output = self.rcs_console.before.decode('utf8').splitlines()
                             outputs.append(output)
                         elif index == 2:
-                            self.rcs_console.sendline(self.rcs_fgt_username)    # this is username for FortiGate login
+                            self.rcs_console.sendline(self.rcs_fmg_username)    # this is username for FortiManager login
                             self.rcs_console.expect('assword: ')
-                            output = self.rcs_console.before.splitlines()
+                            output = self.rcs_console.before.decode('utf8').splitlines()
                             outputs.append(output)
-                        self.rcs_console.sendline('')                       # try black password for FortiGate login
-                        # with FOS 6.0, factory default device take blank password and login
-                        # with FOS 6.2, factory default device take blank password and prompt/force to change/set new password before login
+                        self.rcs_console.sendline('')                       # try black password for FortiManager login
+                        # with FMG 6.0, factory default device take blank password and login
+                        # with FMG 6.2, factory default device take blank password and prompt/force to change/set new password before login
                         index = self.rcs_console.expect([' # ', 'New Password:', pexpect.EOF, pexpect.TIMEOUT], timeout=15)
-                        output = self.rcs_console.before.splitlines()
+                        output = self.rcs_console.before.decode('utf8').splitlines()
                         outputs.append(output)
-                        if index == 0:  # this is FOS 6.0 factory default behavior
+                        if index == 0:  # this is FMG 6.0 factory default behavior
                             self.factorydefault = True
-                        elif index == 1:  # this is FOS 6.2 factory default behavior
-                            self.rcs_console.sendline(self.rcs_fgt_password)
-                            self.rcs_console.expect('Confirm Password:')
-                            self.rcs_console.sendline(self.rcs_fgt_password)
+                        elif index == 1:  # this is FMG 6.2 factory default behavior
+                            self.rcs_console.sendline(self.rcs_fmg_password)
+                            self.rcs_console.expect('Re-enter New Password:')
+                            self.rcs_console.sendline(self.rcs_fmg_password)
                             self.rcs_console.expect(' # ')
                             self.factorydefault = True
                         elif index > 1:
-                            raise Exception('Attemtp to login to FortiGate failed please check username/password for FortiGate')
-                elif index == 3:                                        # with this, we want to figure out the hostname for FortiGate for better expect/match
-                    hostname = self.rcs_console.before.decode('utf-8').splitlines()[-1].split(' ')[0]
-                    # the first split find the last line, which contains the hostname
-                    # the second split, in case FortiGate is inside configuration section or in global/vdom, FortiGate doesn't allow space in hostname
-                    self.rcs_fgt_prompt = ['dummy_placeholder', hostname + ' # ', hostname + r' \(.+\) # ', ' # ', ' login: ', 'to accept']
+                            raise Exception('Attemtp to login to FortiManager failed please check username/password for FortiManager')
+                elif index == 4:                                        # with this, we want to figure out the hostname for FortiManager for better expect/match
                     prompt_index = 0
                     while prompt_index != 1:
-                        self.rcs_console.sendline('')
-                        prompt_index = self.rcs_console.expect(self.rcs_fgt_prompt)
-                        output = self.rcs_console.before.splitlines()
+                        self.rcs_console.sendline('end')
+                        prompt_index = self.rcs_console.expect(['dummy_placeholder', ' # ', r'\(.+\)# ', pexpect.EOF, pexpect.TIMEOUT])
+                        output = self.rcs_console.before.decode('utf8').splitlines()
                         outputs.append(output)
-                        if prompt_index == 2:                           # reset FortiGate back root level (self.rcs_fgt_prompt)
-                            self.rcs_console.sendline('abort')
-                            prompt_index = self.rcs_console.expect(self.rcs_fgt_prompt)
-                            output = self.rcs_console.before.splitlines()
-                            outputs.append(output)
-
-                            self.rcs_console.sendline('end')
-                            prompt_index = self.rcs_console.expect(self.rcs_fgt_prompt)
-                            output = self.rcs_console.before.splitlines()
-                            outputs.append(output)
+                elif index == 3:                                        # with this, we want to figure out the hostname for FortiManager for better expect/match
+                    hostname = self.rcs_console.before.decode('utf-8').splitlines()[-1].split(' ')[0]
+                    # the first split find the last line, which contains the hostname
+                    # the second split, in case FortiManager is inside configuration section or in global/vdom, FortiManager doesn't allow space in hostname
+                    self.rcs_fmg_prompt = ['dummy_placeholder', hostname + ' # ', ' # ', r'\(.+\)# ', ' login: ', 'to accept']
                 # This is to handle Avocent's "non-simultaneous session" access issue
-                elif index == 4:                                        # with this, raise exception
-                    raise Exception('Attemtp to connect to remote console port but failed, please check if remote console port is being used by other user')
                 elif index == 5:                                        # with this, raise exception
-                    raise Exception('Attemtp to read/write remote console port but failed, please check if FortiGate is on and console port is connected')
+                    raise Exception('Attemtp to connect to remote console port but failed, please check if remote console port is being used by other user')
+                elif index == 6:                                        # with this, raise exception
+                    raise Exception('Attemtp to read/write remote console port but failed, please check if FortiManager is on and console port is connected')
 
-            # Another thing we need to take care of is to set console output to standard mode (default is more mode)
-            self.rcs_console.sendline('config global')    # if FortiGate has VDOM enabled, if not, this will generate an message, but won't cause any problem
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            self.rcs_console.sendline('config system console')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            self.rcs_console.sendline('set output standard')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            self.rcs_console.sendline('end')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
-            outputs.append(output)
-
-            self.rcs_console.sendline('get system status | grep Version:')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
+            self.rcs_console.sendline('get system status')
+            self.rcs_console.expect(self.rcs_fmg_prompt)
             for line in self.rcs_console.before.decode('utf8').splitlines():
-                if line.find('Version: ') == 0:
-                    self.version = line[len('Version: '):]
+                m = re.search(r'^Version\s+: ', line)
+                if m:
+                    _, end = m.span()
+                    self.version = line[end:]
                     break
 
-            self.rcs_console.sendline('get system status | grep Serial-Number:')
-            self.rcs_console.expect(self.rcs_fgt_prompt)
             for line in self.rcs_console.before.decode('utf8').splitlines():
-                if line.find('Serial-Number: ') == 0:
-                    self.serial = line[len('Serial-Number: '):]
+                m = re.search(r'^Serial Number\s+: ', line)
+                if m:
+                    _, end = m.span()
+                    self.serial = line[end:]
                     break
 
-            self.rcs_console.sendline('end')    # end to close out if FortiGate has VDOM enabled.
-            self.rcs_console.expect(self.rcs_fgt_prompt)
-            output = self.rcs_console.before.splitlines()
+            output = self.rcs_console.before.decode('utf8').splitlines()
             outputs.append(output)
 
         except Exception as error:
@@ -869,7 +774,7 @@ class fortigate_remote_console():
             return outputs
 
     ############################################################################
-    def fortigate_remote_console_logout(self):
+    def fortimanager_remote_console_logout(self):
         outputs = []
 
         # in case FGT console is in the middle of something
@@ -878,13 +783,13 @@ class fortigate_remote_console():
             prompt_index = 0
             while prompt_index != 1:
                 self.rcs_console.sendline('')
-                prompt_index = self.rcs_console.expect(self.rcs_fgt_prompt)
-                output = self.rcs_console.before.splitlines()
+                prompt_index = self.rcs_console.expect(self.rcs_fmg_prompt)
+                output = self.rcs_console.before.decode('utf8').splitlines()
                 outputs.append(output)
-                if prompt_index == 2:           # reset FortiGate back root level (self.rcs_fgt_prompt)
+                if prompt_index == 2:           # reset FortiManager back root level (self.rcs_fmg_prompt)
                     self.rcs_console.sendline('abort')
-                    prompt_index = self.rcs_console.expect(self.rcs_fgt_prompt)
-                    output = self.rcs_console.before.splitlines()
+                    prompt_index = self.rcs_console.expect(self.rcs_fmg_prompt)
+                    output = self.rcs_console.before.decode('utf8').splitlines()
                     outputs.append(output)
                 elif prompt_index == 4:         # FGT is not logged in, no need to do anything
                     break
@@ -910,14 +815,14 @@ def run_module():
         rcs_ip=dict(required=True),     # remote console server (rcs) IP address
         rcs_username=dict(type='str', required=True),   # remote console server (rcs) login username
         rcs_password=dict(type='str', required=True, no_log=True),  # remote console server (rcs) login password
-        rcs_fgt_username=dict(type='str', required=True),   # FortiGate login username
-        rcs_fgt_password=dict(type='str', required=True, no_log=True),  # FortiGate login password
-        rcs_fgt_port=dict(type=int, required=True),   # remote console server port which maps to FortiGate console
-        rcs_fgt_become=dict(type='str', required=False, default=''),  # some remote console server need to run special command in order to access FGT console
-        rcs_fgt_action=dict(choices=['cli', 'factoryreset', 'reboot', 'erasedisk', 'diskformat', 'restoreimage', 'purgedhcp'],
-                            type='str', required=False, default='cli'),     # what action perform on FortiGate
+        rcs_fmg_username=dict(type='str', required=True),   # FortiManager login username
+        rcs_fmg_password=dict(type='str', required=True, no_log=True),  # FortiManager login password
+        rcs_fmg_port=dict(type=int, required=True),   # remote console server port which maps to FortiManager console
+        rcs_fmg_become=dict(type='str', required=False, default=''),  # some remote console server need to run special command in order to access FGT console
+        rcs_fmg_action=dict(choices=['cli', 'factoryreset', 'reboot', 'erasedisk', 'diskformat', 'restoreimage'],
+                            type='str', required=False, default='cli'),     # what action perform on FortiManager
         rcs_timeout=dict(type='int', required=False, default=5),  # remote console server (rcs) login timeout (in minute)
-        rcs_fgt_cli=dict(type='list', required=False, default=['get system status'])   # which CLI action, put list of CLI (configuration) here
+        rcs_fmg_cli=dict(type='list', required=False, default=['get system status'])   # which CLI action, put list of CLI (configuration) here
     )
 
     # seed the result dict in the object
@@ -927,7 +832,7 @@ def run_module():
     # for consumption, for example, in a subsequent task
     result = dict(
         changed=False,
-        rcs_fgt_action_result={}
+        rcs_fmg_action_result={}
     )
 
     # the AnsibleModule object will be our abstraction working with Ansible
@@ -941,91 +846,78 @@ def run_module():
 
     # module params check
     # at least one outlet port or console port present
-    if module.params['rcs_fgt_port'] is None:
-        module.fail_json(msg='rcs_fgt_port needs to be specified', **result)
+    if module.params['rcs_fmg_port'] is None:
+        module.fail_json(msg='rcs_fmg_port needs to be specified', **result)
 
-    _fortigate_remote_console = fortigate_remote_console(module.params['rcs_ip'], module.params['rcs_username'], module.params['rcs_password'],
-                                                         module.params['rcs_fgt_username'], module.params['rcs_fgt_password'], module.params['rcs_fgt_port'],
-                                                         module.params['rcs_fgt_cli'], module.params['rcs_fgt_become'], module.params['rcs_timeout'])
-    if module.params['rcs_fgt_action'] is not None:
-        # perform restore image on FortiGate, 1) reboot 2) interrupt BIOS 3) restore firmware from TFTP
-        if module.params['rcs_fgt_action'] == 'restoreimage':
-            console_result = _fortigate_remote_console.fortigate_remote_console_restoreimage()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
+    _fortimanager_remote_console = fortimanager_remote_console(module.params['rcs_ip'], module.params['rcs_username'], module.params['rcs_password'],
+                                                         module.params['rcs_fmg_username'], module.params['rcs_fmg_password'], module.params['rcs_fmg_port'],
+                                                         module.params['rcs_fmg_cli'], module.params['rcs_fmg_become'], module.params['rcs_timeout'])
+    if module.params['rcs_fmg_action'] is not None:
+        # perform restore image on FortiManager, 1) reboot 2) interrupt BIOS 3) restore firmware from TFTP
+        if module.params['rcs_fmg_action'] == 'restoreimage':
+            console_result = _fortimanager_remote_console.fortimanager_remote_console_restoreimage()
+            result['rcs_fmg_action_result'] = console_result['console_action_result']
+            result['serial'] = _fortimanager_remote_console.serial
+            result['version'] = _fortimanager_remote_console.version
+            result['factorydefault'] = _fortimanager_remote_console.factorydefault
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_restoreimage', **result)
+                module.fail_json(msg='Something wrong with rcs_fmg_restoreimage', **result)
                 return
             result['changed'] = console_result['changed']
-        # perform purgedhcp on FortiGate CLI
-        elif module.params['rcs_fgt_action'] == 'purgedhcp':
-            console_result = _fortigate_remote_console.fortigate_remote_console_purgedhcp()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
+        # perform diskformat on FortiManager CLI
+        elif module.params['rcs_fmg_action'] == 'diskformat':
+            console_result = _fortimanager_remote_console.fortimanager_remote_console_diskformat()
+            result['rcs_fmg_action_result'] = console_result['console_action_result']
+            result['serial'] = _fortimanager_remote_console.serial
+            result['version'] = _fortimanager_remote_console.version
+            result['factorydefault'] = _fortimanager_remote_console.factorydefault
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_purgedhcp, please check if remote console server is accessible and/or ' +
-                                     'FortiGate is on and connected and/or FortiGate console connection is being used by another user!',
-                                 **result)
-                return
-            result['changed'] = console_result['changed']    # a reboot action is always has changed = True
-        # perform diskformat on FortiGate CLI
-        elif module.params['rcs_fgt_action'] == 'diskformat':
-            console_result = _fortigate_remote_console.fortigate_remote_console_diskformat()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
-            if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_diskformat', **result)
+                module.fail_json(msg='Something wrong with rcs_fmg_diskformat', **result)
                 return
             result['disks'] = console_result['disks']
             result['changed'] = console_result['changed']    # a reboot action is always has changed = True
-        # perform factoryreset on FortiGate CLI
-        elif module.params['rcs_fgt_action'] == 'factoryreset':
-            console_result = _fortigate_remote_console.fortigate_remote_console_factoryreset()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
+        # perform factoryreset on FortiManager CLI
+        elif module.params['rcs_fmg_action'] == 'factoryreset':
+            console_result = _fortimanager_remote_console.fortimanager_remote_console_factoryreset()
+            result['rcs_fmg_action_result'] = console_result['console_action_result']
+            result['serial'] = _fortimanager_remote_console.serial
+            result['version'] = _fortimanager_remote_console.version
+            result['factorydefault'] = _fortimanager_remote_console.factorydefault
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_factoryreset', **result)
+                module.fail_json(msg='Something wrong with rcs_fmg_factoryreset', **result)
                 return
             result['changed'] = console_result['changed']
-        # perform reboot on FortiGate CLI
-        elif module.params['rcs_fgt_action'] == 'reboot':
-            console_result = _fortigate_remote_console.fortigate_remote_console_reboot()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
+        # perform reboot on FortiManager CLI
+        elif module.params['rcs_fmg_action'] == 'reboot':
+            console_result = _fortimanager_remote_console.fortimanager_remote_console_reboot()
+            result['rcs_fmg_action_result'] = console_result['console_action_result']
+            result['serial'] = _fortimanager_remote_console.serial
+            result['version'] = _fortimanager_remote_console.version
+            result['factorydefault'] = _fortimanager_remote_console.factorydefault
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_reboot', **result)
+                module.fail_json(msg='Something wrong with rcs_fmg_reboot', **result)
                 return
             result['changed'] = console_result['changed']
-        # perform erasedisk on FortiGate CLI
-        elif module.params['rcs_fgt_action'] == 'erasedisk':
-            console_result = _fortigate_remote_console.fortigate_remote_console_erasedisk()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
+        # perform erasedisk on FortiManager CLI
+        elif module.params['rcs_fmg_action'] == 'erasedisk':
+            console_result = _fortimanager_remote_console.fortimanager_remote_console_erasedisk()
+            result['rcs_fmg_action_result'] = console_result['console_action_result']
+            result['serial'] = _fortimanager_remote_console.serial
+            result['version'] = _fortimanager_remote_console.version
+            result['factorydefault'] = _fortimanager_remote_console.factorydefault
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_erasedisk', **result)
+                module.fail_json(msg='Something wrong with rcs_fmg_erasedisk', **result)
                 return
             result['changed'] = console_result['changed']
-        # perform configuration on FortiGate CLI (do not support configuration require interactive yet)
-        elif module.params['rcs_fgt_action'] == 'cli':
-            console_result = _fortigate_remote_console.fortigate_remote_console_cli()
-            result['rcs_fgt_action_result'] = console_result['console_action_result']
-            result['serial'] = _fortigate_remote_console.serial
-            result['version'] = _fortigate_remote_console.version
-            result['factorydefault'] = _fortigate_remote_console.factorydefault
+        # perform configuration on FortiManager CLI (do not support configuration require interactive yet)
+        elif module.params['rcs_fmg_action'] == 'cli':
+            console_result = _fortimanager_remote_console.fortimanager_remote_console_cli()
+            result['rcs_fmg_action_result'] = console_result['console_action_result']
+            result['serial'] = _fortimanager_remote_console.serial
+            result['version'] = _fortimanager_remote_console.version
+            result['factorydefault'] = _fortimanager_remote_console.factorydefault
             if console_result['status']:
-                module.fail_json(msg='Something wrong with rcs_fgt_cli', **result)
+                module.fail_json(msg='Something wrong with rcs_fmg_cli', **result)
                 return
             result['changed'] = True
 
