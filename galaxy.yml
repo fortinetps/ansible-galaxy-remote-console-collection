@@ -9,7 +9,7 @@ namespace: fortinetps
 name: remote_console
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 0.1.7
+version: 0.2.1
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -23,7 +23,7 @@ authors:
 ### OPTIONAL but strongly recommended
 
 # A short summary description of the collection
-description: your collection description
+description: FortiGate, FortiManager, FortiAnalyzer Remote Console Module
 
 # Either a single license or a list of licenses for content inside of a collection. Ansible Galaxy currently only
 # accepts L(SPDX,https://spdx.org/licenses/) licenses. This key is mutually exclusive with 'license_file'
@@ -45,16 +45,16 @@ tags: [networking, security, firewall, fortinet, fortios, fortigate, console]
 dependencies: {}
 
 # The URL of the originating SCM repository
-repository: https://github.com/fortinetps/ansible_fortigate_remote_console
+repository: https://github.com/fortinetps/ansible-galaxy-remote-console-collection
 
 # The URL to any online docs
-documentation: https://github.com/fortinetps/ansible_fortigate_remote_console
+documentation: https://github.com/fortinetps/ansible-galaxy-remote-console-collection
 
 # The URL to the homepage of the collection/project
-homepage: https://github.com/fortinetps/ansible_fortigate_remote_console
+homepage: https://github.com/fortinetps/ansible-galaxy-remote-console-collection
 
 # The URL to the collection issue tracker
-issues: https://github.com/fortinetps/ansible_fortigate_remote_console/issues
+issues: https://github.com/fortinetps/ansible-galaxy-remote-console-collection
 
 # A list of file glob-like patterns used to filter any files or directories that should not be included in the build
 # artifact. A pattern is matched from the relative path of the file or directory of the collection directory. This
