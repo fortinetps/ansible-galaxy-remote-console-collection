@@ -1,11 +1,16 @@
 {
-	"name": "Ansible Standard Dev Env: Debian 9, Python 3.7, Ansible Devel (2.10)",
-	"dockerFile": "Dockerfile",
-	"context": "..",
+	"name": "Ansible Standard Dev Env: Debian 9, Python 3.7, Ansible Base (2.10)",
+	"image": "fortinetps/ansible2.10_python3.7",
+	// "dockerFile": "Dockerfile",
+	// "context": "..",
 	"extensions": [
-		"ms-python.python"
+		"ms-python.python",
+		"fr43nk.seito-openfile"
 	],
 	"settings": {
-		"python.pythonPath": "/usr/local/bin/python"
+		"python.pythonPath": "/usr/local/bin/python",
+		"python.linting.enabled": true,
+		"python.linting.pylintEnabled": true,
+		"python.linting.pylintPath": "/usr/local/bin/pylint"
 	}
 }
